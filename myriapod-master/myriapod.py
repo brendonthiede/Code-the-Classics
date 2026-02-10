@@ -1,4 +1,4 @@
-import pgzero, pgzrun, pygame, sys
+import pgzero, pgzrun, pygame, sys, os
 from random import choice, randint, random
 from enum import Enum
 
@@ -23,6 +23,74 @@ HEIGHT = 800
 TITLE = "Myriapod"
 
 DEBUG_TEST_RANDOM_POSITIONS = False
+
+# Audio init status. We try to initialise SDL audio once at startup and keep the game playable
+# even when audio isn't available (common in containers/WSL/headless setups).
+AUDIO_AVAILABLE = False
+AUDIO_DRIVER = None
+
+def init_audio():
+    global AUDIO_AVAILABLE, AUDIO_DRIVER
+
+    # WSLg provides a PulseAudio server via a Unix socket.
+    try:
+        if os.path.exists("/mnt/wslg/PulseServer") and not os.environ.get("PULSE_SERVER"):
+            os.environ["PULSE_SERVER"] = "unix:/mnt/wslg/PulseServer"
+    except Exception:
+        pass
+
+    try:
+        pygame.mixer.quit()
+    except Exception:
+        pass
+
+    preferred = []
+    if os.environ.get("SDL_AUDIODRIVER"):
+        preferred.append(os.environ.get("SDL_AUDIODRIVER"))
+
+    if os.path.exists("/mnt/wslg/PulseServer"):
+        preferred += ["pulseaudio", None]
+    else:
+        preferred += [None]
+    preferred += ["pipewire", "pulseaudio", "alsa", "jack", "dummy"]
+
+    errors = []
+    dummy_worked = False
+    for driver in preferred:
+        if driver is None:
+            os.environ.pop("SDL_AUDIODRIVER", None)
+        else:
+            os.environ["SDL_AUDIODRIVER"] = driver
+
+        try:
+            pygame.mixer.init(44100, -16, 2, 1024)
+            AUDIO_DRIVER = os.environ.get("SDL_AUDIODRIVER")
+            if AUDIO_DRIVER == "dummy":
+                AUDIO_AVAILABLE = False
+                dummy_worked = True
+                break
+            else:
+                AUDIO_AVAILABLE = True
+                return
+        except Exception as e:
+            errors.append((os.environ.get("SDL_AUDIODRIVER"), repr(e)))
+
+    if dummy_worked:
+        print("Sound/music unavailable: only SDL_AUDIODRIVER=dummy works on this system.", file=sys.stderr)
+        for d, err in errors[:6]:
+            print("  tried {0}: {1}".format(d, err), file=sys.stderr)
+        if os.path.exists("/mnt/wslg/PulseServer"):
+            print("Hint (WSL): install libpulse0 (for libpulse-simple.so.0). WSLg already provides the Pulse server.", file=sys.stderr)
+        else:
+            print("Hint (Linux): install audio backend libs (commonly libasound.so.2 and libpulse-simple.so.0) and ensure an audio device is available.", file=sys.stderr)
+        return
+
+    AUDIO_AVAILABLE = False
+    AUDIO_DRIVER = None
+    print("Audio disabled: failed to initialise pygame.mixer", file=sys.stderr)
+    for d, err in errors[:6]:
+        print("  tried {0}: {1}".format(d, err), file=sys.stderr)
+    print("Hint (Linux): install ALSA/Pulse libs (e.g. libasound.so.2, libpulse-simple.so.0) or run with audio access.", file=sys.stderr)
 
 # Pygame Zero allows you to access and change sprite positions based on various
 # anchor points
@@ -60,7 +128,7 @@ class Player(Actor):
 
     INVULNERABILITY_TIME = 100
     RESPAWN_TIME = 100
-    RELOAD_TIME = 10
+    RELOAD_TIME = 1
 
     def __init__(self, pos):
         super().__init__("blank", pos)
@@ -797,6 +865,8 @@ class Game:
                 obj.draw()
 
     def play_sound(self, name, count=1):
+        if not AUDIO_AVAILABLE:
+            return
         # Some sounds have multiple varieties. If count > 1, we'll randomly choose one from those
         # We don't play any sounds if there is no player (e.g. if we're on the menu)
         if self.player:
@@ -851,7 +921,11 @@ def update():
 
     elif state == State.PLAY:
         if game.player.lives == 0 and game.player.timer == 100:
-            sounds.gameover.play()
+            if AUDIO_AVAILABLE:
+                try:
+                    sounds.gameover.play()
+                except Exception:
+                    pass
             state = State.GAME_OVER
         else:
             game.update()
@@ -892,15 +966,13 @@ def draw():
         screen.blit("over", (0, 0))
 
 # Set up music on game start
-try:
-    pygame.mixer.quit()
-    pygame.mixer.init(44100, -16, 2, 1024)
-
-    music.play("theme")
-    music.set_volume(0.4)
-except:
-    # If an error occurs, just ignore it
-    pass
+init_audio()
+if AUDIO_AVAILABLE:
+    try:
+        music.play("theme")
+        music.set_volume(0.4)
+    except Exception as e:
+        print("Audio error: {0}".format(repr(e)), file=sys.stderr)
 
 # Set the initial game state
 state = State.MENU

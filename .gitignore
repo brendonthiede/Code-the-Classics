@@ -1,1 +1,9 @@
 ﻿.idea
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Runtime files
+high_score.txt

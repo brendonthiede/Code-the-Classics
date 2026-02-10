@@ -1,6 +1,6 @@
 # If the window is too tall to fit on the screen, check your operating system display settings and reduce display
 # scaling if it is enabled.
-import pgzero, pgzrun, pygame, sys
+import pgzero, pgzrun, pygame, sys, os
 from random import *
 from enum import Enum
 
@@ -28,6 +28,79 @@ ROW_HEIGHT = 40
 
 # See what happens when you change this to True
 DEBUG_SHOW_ROW_BOUNDARIES = False
+
+# Always store/save the high score next to this script, regardless of the
+# process working directory.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+HIGH_SCORE_PATH = os.path.join(SCRIPT_DIR, "high_score.txt")
+print("High score file path: {0}".format(HIGH_SCORE_PATH))
+
+# Audio init status. We try to initialise SDL audio once at startup and keep the game playable
+# even when audio isn't available (common in containers/WSL/headless setups).
+AUDIO_AVAILABLE = False
+AUDIO_DRIVER = None
+
+def init_audio():
+    global AUDIO_AVAILABLE, AUDIO_DRIVER
+
+    # WSLg provides a PulseAudio server via a Unix socket.
+    try:
+        if os.path.exists("/mnt/wslg/PulseServer") and not os.environ.get("PULSE_SERVER"):
+            os.environ["PULSE_SERVER"] = "unix:/mnt/wslg/PulseServer"
+    except Exception:
+        pass
+
+    try:
+        pygame.mixer.quit()
+    except Exception:
+        pass
+
+    preferred = []
+    if os.environ.get("SDL_AUDIODRIVER"):
+        preferred.append(os.environ.get("SDL_AUDIODRIVER"))
+    if os.path.exists("/mnt/wslg/PulseServer"):
+        preferred += ["pulseaudio", None]
+    else:
+        preferred += [None]
+    preferred += ["pipewire", "pulseaudio", "alsa", "jack", "dummy"]
+
+    errors = []
+    dummy_worked = False
+    for driver in preferred:
+        if driver is None:
+            os.environ.pop("SDL_AUDIODRIVER", None)
+        else:
+            os.environ["SDL_AUDIODRIVER"] = driver
+
+        try:
+            pygame.mixer.init(44100, -16, 2, 512)
+            AUDIO_DRIVER = os.environ.get("SDL_AUDIODRIVER")
+            if AUDIO_DRIVER == "dummy":
+                AUDIO_AVAILABLE = False
+                dummy_worked = True
+                break
+            else:
+                AUDIO_AVAILABLE = True
+                return
+        except Exception as e:
+            errors.append((os.environ.get("SDL_AUDIODRIVER"), repr(e)))
+
+    if dummy_worked:
+        print("Sound/music unavailable: only SDL_AUDIODRIVER=dummy works on this system.", file=sys.stderr)
+        for d, err in errors[:6]:
+            print("  tried {0}: {1}".format(d, err), file=sys.stderr)
+        if os.path.exists("/mnt/wslg/PulseServer"):
+            print("Hint (WSL): install libpulse0 (for libpulse-simple.so.0). WSLg already provides the Pulse server.", file=sys.stderr)
+        else:
+            print("Hint (Linux): install audio backend libs (commonly libasound.so.2 and libpulse-simple.so.0) and ensure an audio device is available.", file=sys.stderr)
+        return
+
+    AUDIO_AVAILABLE = False
+    AUDIO_DRIVER = None
+    print("Audio disabled: failed to initialise pygame.mixer", file=sys.stderr)
+    for d, err in errors[:6]:
+        print("  tried {0}: {1}".format(d, err), file=sys.stderr)
+    print("Hint (Linux): install ALSA/Pulse libs (e.g. libasound.so.2, libpulse-simple.so.0) or run with audio access.", file=sys.stderr)
 
 # The MyActor class extends Pygame Zero's Actor class by allowing an object to have a list of child objects,
 # which are drawn relative to the parent object.
@@ -640,14 +713,15 @@ class Game:
         self.bunner = bunner
         self.looped_sounds = {}
 
-        try:
-            if bunner:
-                music.set_volume(0.4)
-            else:
-                music.play("theme")
-                music.set_volume(1)
-        except:
-            pass
+        if AUDIO_AVAILABLE:
+            try:
+                if bunner:
+                    music.set_volume(0.4)
+                else:
+                    music.play("theme")
+                    music.set_volume(1)
+            except Exception as e:
+                print("Audio error: {0}".format(repr(e)), file=sys.stderr)
 
         self.eagle = None
         self.frame = 0
@@ -738,6 +812,8 @@ class Game:
         return int(-320 - game.bunner.min_y) // 40
 
     def play_sound(self, name, count=1):
+        if not AUDIO_AVAILABLE:
+            return
         try:
             # Some sounds have multiple varieties. If count > 1, we'll randomly choose one from those
             # We don't play any sounds if there is no player (e.g. if we're on the menu)
@@ -755,6 +831,8 @@ class Game:
             pass
 
     def loop_sound(self, name, count, volume):
+        if not AUDIO_AVAILABLE:
+            return
         try:
             # Similar to play_sound above, but for looped sounds we need to keep a reference to the sound so that we can
             # later modify its volume or turn it off. We use the dictionary self.looped_sounds for this - the sound
@@ -778,6 +856,8 @@ class Game:
 
 
     def stop_looped_sounds(self):
+        if not AUDIO_AVAILABLE:
+            return
         try:
             for sound in self.looped_sounds.values():
                 sound.stop()
@@ -840,10 +920,11 @@ def update():
 
             # Write high score file
             try:
-                with open("high.txt", "w") as file:
+                with open(HIGH_SCORE_PATH, "w") as file:
                     file.write(str(high_score))
             except:
                 # If an error occurs writing the file, just ignore it and carry on, rather than crashing
+                print("Error writing high score file", file=sys.stderr)
                 pass
 
             state = State.GAME_OVER
@@ -874,17 +955,15 @@ def draw():
         screen.blit("gameover", (0, 0))
 
 # Set up sound system
+init_audio()
 try:
-    pygame.mixer.quit()
-    pygame.mixer.init(44100, -16, 2, 512)
     pygame.mixer.set_num_channels(16)
-except:
-    # If an error occurs, just ignore it
+except Exception:
     pass
 
 # Load high score from file
 try:
-    with open("high.txt", "r") as f:
+    with open(HIGH_SCORE_PATH, "r") as f:
         high_score = int(f.read())
 except:
     # If opening the file fails (likely because it hasn't yet been created), set high score to 0

@@ -1,5 +1,5 @@
 import pgzero, pgzrun, pygame
-import math, sys, random
+import math, sys, random, os
 from enum import Enum
 from pygame.math import Vector2
 
@@ -75,6 +75,78 @@ DEBUG_SHOW_TARGETS = False
 DEBUG_SHOW_PEERS = False
 DEBUG_SHOW_SHOOT_TARGET = False
 DEBUG_SHOW_COSTS = False
+
+# Audio init status. We try to initialise SDL audio once at startup and keep the game playable
+# even when audio isn't available (common in containers/WSL/headless setups).
+AUDIO_AVAILABLE = False
+AUDIO_DRIVER = None
+
+def init_audio():
+    global AUDIO_AVAILABLE, AUDIO_DRIVER
+
+    # WSLg provides a PulseAudio server via a Unix socket.
+    # If present, point SDL/Pulse at it so we can get real audio output in WSL.
+    try:
+        if os.path.exists("/mnt/wslg/PulseServer") and not os.environ.get("PULSE_SERVER"):
+            os.environ["PULSE_SERVER"] = "unix:/mnt/wslg/PulseServer"
+    except Exception:
+        pass
+
+    # Pygame Zero/Pygame may already have touched the mixer; force a clean re-init.
+    try:
+        pygame.mixer.quit()
+    except Exception:
+        pass
+
+    # Try a few common SDL audio backends. If none are available, fall back to 'dummy'
+    # (which keeps the game running but produces no sound).
+    preferred = []
+    if os.environ.get("SDL_AUDIODRIVER"):
+        preferred.append(os.environ.get("SDL_AUDIODRIVER"))
+    # If WSLg PulseServer exists, try pulseaudio early.
+    if os.path.exists("/mnt/wslg/PulseServer"):
+        preferred += ["pulseaudio", None]
+    else:
+        preferred += [None]
+    preferred += ["pipewire", "pulseaudio", "alsa", "jack", "dummy"]
+
+    errors = []
+    dummy_worked = False
+    for driver in preferred:
+        if driver is None:
+            os.environ.pop("SDL_AUDIODRIVER", None)
+        else:
+            os.environ["SDL_AUDIODRIVER"] = driver
+
+        try:
+            pygame.mixer.init(44100, -16, 2, 1024)
+            AUDIO_DRIVER = os.environ.get("SDL_AUDIODRIVER")
+            if AUDIO_DRIVER == "dummy":
+                AUDIO_AVAILABLE = False
+                dummy_worked = True
+                break
+            else:
+                AUDIO_AVAILABLE = True
+                return
+        except Exception as e:
+            errors.append((os.environ.get("SDL_AUDIODRIVER"), repr(e)))
+
+    if dummy_worked:
+        print("Sound/music unavailable: only SDL_AUDIODRIVER=dummy works on this system.", file=sys.stderr)
+        for d, err in errors[:6]:
+            print("  tried {0}: {1}".format(d, err), file=sys.stderr)
+        if os.path.exists("/mnt/wslg/PulseServer"):
+            print("Hint (WSL): install libpulse0 (for libpulse-simple.so.0). WSLg already provides the Pulse server.", file=sys.stderr)
+        else:
+            print("Hint (Linux): install audio backend libs (commonly libasound.so.2 and libpulse-simple.so.0) and ensure an audio device is available.", file=sys.stderr)
+        return
+
+    AUDIO_AVAILABLE = False
+    AUDIO_DRIVER = None
+    print("Audio disabled: failed to initialise pygame.mixer", file=sys.stderr)
+    for d, err in errors[:6]:
+        print("  tried {0}: {1}".format(d, err), file=sys.stderr)
+    print("Hint (Linux): install ALSA/Pulse libs (e.g. libasound.so.2, libpulse-simple.so.0) or run with audio access.", file=sys.stderr)
 
 class Difficulty:
     def __init__(self, goalie_enabled, second_lead_enabled, speed_boost, holdoff_timer):
@@ -698,19 +770,20 @@ class Game:
         self.teams = [Team(p1_controls), Team(p2_controls)]
         self.difficulty = DIFFICULTY[difficulty]
 
-        try:
-            if self.teams[0].human():
-                # Beginning a game with at least 1 human player
-                music.fadeout(1)
-                sounds.crowd.play(-1)
-                sounds.start.play()
-            else:
-                # No players - we must be on the menu. Play title music.
-                music.play("theme")
-                sounds.crowd.stop()
-        except Exception:
-            # Ignore sound errors
-            pass
+        if AUDIO_AVAILABLE:
+            try:
+                if self.teams[0].human():
+                    # Beginning a game with at least 1 human player
+                    music.fadeout(1)
+                    sounds.crowd.play(-1)
+                    sounds.start.play()
+                else:
+                    # No players - we must be on the menu. Play title music.
+                    music.play("theme")
+                    sounds.crowd.stop()
+            except Exception as e:
+                # Keep the game playable if audio fails mid-run, but don't hide the reason.
+                print("Audio error: {0}".format(repr(e)), file=sys.stderr)
 
         self.score_timer = 0
         self.scoring_team = 1   # Which team has just scored - also governs who kicks off next
@@ -942,7 +1015,7 @@ class Game:
 
     def play_sound(self, name, c):
         # Only play sounds if we're not in the menu state
-        if state != State.MENU:
+        if state != State.MENU and AUDIO_AVAILABLE:
             try:
                 getattr(sounds, name+str(random.randint(0, c-1))).play()
             except:
@@ -1105,12 +1178,7 @@ def draw():
             screen.blit(img, (HALF_WINDOW_W + 25 - 125 * i, 144))
 
 # Set up sound system
-try:
-    pygame.mixer.quit()
-    pygame.mixer.init(44100, -16, 2, 1024)
-except Exception:
-    # Ignore sound errors
-    pass
+init_audio()
 
 # Set the initial game state
 state = State.MENU
