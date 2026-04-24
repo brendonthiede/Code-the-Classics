@@ -24,8 +24,8 @@
 		}
 	},
 
-	// Port 6080: noVNC browser UI  |  Port 5901: raw VNC
-	"forwardPorts": [6080, 5901],
+	// Port 6080: noVNC browser UI  |  Port 5901: raw VNC  |  Port 8000: web game server
+	"forwardPorts": [6080, 5901, 8000],
 
 	// Start the virtual display stack (Xvfb + VNC + noVNC + audio) every time the container starts.
 	"postStartCommand": "/usr/local/bin/start-display.sh",
@@ -39,6 +39,10 @@
 		},
 		"5901": {
 			"label": "VNC"
+		},
+		"8000": {
+			"label": "Soccer Web Game",
+			"visibility": "public"
 		}
 	},
 	"remoteEnv": {

@@ -7,3 +7,6 @@ __pycache__/
 
 # Runtime files
 high_score.txt
+
+# soccer-web build output
+soccer-web/build/
