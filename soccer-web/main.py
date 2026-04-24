@@ -432,7 +432,7 @@ def dist_key(pos):
 def safe_normalise(vec):
     length = vec.length()
     if length == 0:
-        return Vector2(0,0), 0
+        return Vector2(0, 0), 0
     else:
         return vec.normalize(), length
 
@@ -530,9 +530,9 @@ def avg(a, b):
 
 def on_pitch(x, y):
     # Only used when dribbling
-    return PITCH_RECT.collidepoint(x,y) \
-           or GOAL_0_RECT.collidepoint(x,y) \
-           or GOAL_1_RECT.collidepoint(x,y)
+    return PITCH_RECT.collidepoint(x, y) \
+           or GOAL_0_RECT.collidepoint(x, y) \
+           or GOAL_1_RECT.collidepoint(x, y)
 
 class Ball(MyActor):
     def __init__(self):
@@ -799,7 +799,7 @@ class Player(MyActor):
 
         # Some shorthand variables to make the code below a bit easier to follow
         my_team = game.teams[self.team]
-        pre_kickoff = game.kickoff_player != None
+        pre_kickoff = game.kickoff_player is not None
         i_am_kickoff_player = self == game.kickoff_player
         ball = game.ball
 
@@ -996,7 +996,7 @@ class Team:
         self.score = 0
 
     def human(self):
-        return self.controls != None
+        return self.controls is not None
 
 
 class Game:
@@ -1219,32 +1219,32 @@ class Game:
                 if game.ball.owner and p.lead:
                     line_start = game.ball.owner.vpos - offset
                     line_end = p.vpos - offset
-                    pygame.draw.line(screen.surface, (0,0,0), line_start, line_end)
+                    pygame.draw.line(screen.surface, (0, 0, 0), line_start, line_end)
 
         if DEBUG_SHOW_TARGETS:
             for p in self.players:
                 line_start = p.debug_target - offset
                 line_end = p.vpos - offset
-                pygame.draw.line(screen.surface, (255,0,0), line_start, line_end)
+                pygame.draw.line(screen.surface, (255, 0, 0), line_start, line_end)
 
         if DEBUG_SHOW_PEERS:
             for p in self.players:
                 line_start = p.peer.vpos - offset
                 line_end = p.vpos - offset
-                pygame.draw.line(screen.surface, (0,0,255), line_start, line_end)
+                pygame.draw.line(screen.surface, (0, 0, 255), line_start, line_end)
 
         if DEBUG_SHOW_SHOOT_TARGET:
             if self.debug_shoot_target and self.ball.owner:
                 line_start = self.ball.owner.vpos - offset
                 line_end = self.debug_shoot_target - offset
-                pygame.draw.line(screen.surface, (255,0,255), line_start, line_end)
-        
+                pygame.draw.line(screen.surface, (255, 0, 255), line_start, line_end)
+
         if DEBUG_SHOW_COSTS and self.ball.owner:
-            for x in range(0,LEVEL_W,60):
+            for x in range(0, LEVEL_W, 60):
                 for y in range(0, LEVEL_H, 26):
-                    c = cost(Vector2(x,y), self.ball.owner.team)[0]
-                    screen_pos = Vector2(x,y)-offset
-                    screen_pos = (screen_pos.x,screen_pos.y)    # draw.text can't reliably take a Vector2
+                    c = cost(Vector2(x, y), self.ball.owner.team)[0]
+                    screen_pos = Vector2(x, y) - offset
+                    screen_pos = (screen_pos.x, screen_pos.y)  # draw.text can't reliably take a Vector2
                     screen.draw.text("{0:.0f}".format(c), center=screen_pos)
 
     def play_sound(self, name, c):
