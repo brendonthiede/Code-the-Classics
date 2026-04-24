@@ -35,7 +35,8 @@
 	"portsAttributes": {
 		"8000": {
 			"label": "Soccer Game (browser)",
-			"onAutoForward": "openBrowser"
+			"onAutoForward": "openBrowser",
+			"visibility": "public"
 		}
 	}
 }

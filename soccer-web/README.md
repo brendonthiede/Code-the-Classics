@@ -12,23 +12,26 @@ runs natively in any modern browser.
 
 ## Running in a Codespace
 
-When you open this repository in a Codespace using the **"Browser Native (pygbag)"** dev
-container (`/.devcontainer/browser-native/`), the game server starts automatically on
-port **8000** and the browser tab opens for you.
+> **Note on `pygbag` dev mode**: Running `pygbag soccer-web/` rewrites CDN URLs to
+> `http://localhost:8000` at serve time. When accessed from an external browser via the
+> Codespace forwarded URL, those localhost requests fail. Use `serve.py` instead (see below).
 
-If you need to (re)start it manually:
+Build the WASM bundle once, then start the static server:
 
 ```bash
-pygbag --port 8000 soccer-web/
+pygbag --build soccer-web/   # pack & build into soccer-web/build/web/
+python3 soccer-web/serve.py  # static server on port 8000
 ```
 
-Then open <http://localhost:8000> in your browser.
+Open the app via the **Ports** panel in VS Code (port 8000) — click the globe icon to
+open in your browser, or use the forwarded URL shown there.
 
 ## Running locally
 
 ```bash
 pip install pygbag
-pygbag soccer-web/          # dev server with hot-reload on port 8000
+pygbag --build soccer-web/   # build static WASM bundle
+python3 soccer-web/serve.py  # serve on port 8000
 ```
 
 To build static files for deployment:
