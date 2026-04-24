@@ -1,0 +1,41 @@
+{
+	"name": "Code the Classics – Browser Native (pygbag)",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": "../..",
+		"args": {
+			// Update 'VARIANT' to pick a Python version: 3.12-bookworm, 3.11-bookworm
+			"VARIANT": "3.12-bookworm"
+		}
+	},
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/local/bin/python"
+			},
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.pylint",
+				"ms-python.black-formatter"
+			]
+		}
+	},
+
+	// pygbag dev server – the game runs directly in your browser, no VNC required.
+	"forwardPorts": [8000],
+
+	// Start the pygbag dev server every time the container starts.
+	"postStartCommand": "pygbag --port 8000 /workspaces/Code-the-Classics/soccer-web &",
+
+	"remoteUser": "vscode",
+
+	"portsAttributes": {
+		"8000": {
+			"label": "Soccer Game (browser)",
+			"onAutoForward": "openBrowser"
+		}
+	}
+}
