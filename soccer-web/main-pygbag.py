@@ -131,7 +131,7 @@ class _SoundProxy:
 
     def _get(self) -> pygame.mixer.Sound:
         if self._sound is None:
-            for ext in (".ogg", ".wav", ".mp3"):
+            for ext in (".ogg", ".ogg", ".ogg"):
                 path = os.path.join("sounds", self._name + ext)
                 if os.path.exists(path):
                     try:
@@ -169,7 +169,7 @@ sounds = _Sounds()
 
 class _Music:
     def play(self, name: str):
-        for ext in (".ogg", ".mp3", ".wav"):
+        for ext in (".ogg", ".ogg", ".ogg"):
             path = os.path.join("music", name + ext)
             if os.path.exists(path):
                 try:

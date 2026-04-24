@@ -27,8 +27,9 @@
 	// pygbag dev server – the game runs directly in your browser, no VNC required.
 	"forwardPorts": [8000],
 
-	// Start the pygbag dev server every time the container starts.
-	"postStartCommand": "pygbag --port 8000 /workspaces/Code-the-Classics/soccer-web &",
+	// postStartCommand is intentionally omitted. Run the server manually:
+	//   bash soccer-web/build.sh && python3 soccer-web/serve.py
+	// This avoids port-8000 conflicts with the static serve.py workflow.
 
 	"remoteUser": "vscode",
 
@@ -36,6 +37,8 @@
 		"8000": {
 			"label": "Soccer Game (browser)",
 			"onAutoForward": "openBrowser",
+			// "public" is required so the pygbag WASM runtime can reach the
+			// pygame-web.github.io CDN without CORS/COEP errors via the forwarded URL.
 			"visibility": "public"
 		}
 	}

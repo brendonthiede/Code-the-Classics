@@ -1,6 +1,6 @@
 # Substitute Soccer – Browser Edition
 
-This is a browser-native port of **Substitute Soccer** from the *Code the Classics* book.  
+This is a browser-native port of **Substitute Soccer** from the _Code the Classics_ book.  
 The game runs directly in your browser as WebAssembly – **no VNC or remote desktop required**.
 
 ## How it works
@@ -19,8 +19,8 @@ runs natively in any modern browser.
 Build the WASM bundle once, then start the static server:
 
 ```bash
-pygbag --build soccer-web/   # pack & build into soccer-web/build/web/
-python3 soccer-web/serve.py  # static server on port 8000
+bash soccer-web/build.sh          # resolve symlinks, pack & build into soccer-web/build/web/
+python3 soccer-web/serve.py       # static server on port 8000
 ```
 
 Open the app via the **Ports** panel in VS Code (port 8000) — click the globe icon to
@@ -30,28 +30,37 @@ open in your browser, or use the forwarded URL shown there.
 
 ```bash
 pip install pygbag
-pygbag --build soccer-web/   # build static WASM bundle
-python3 soccer-web/serve.py  # serve on port 8000
+bash soccer-web/build.sh          # resolve symlinks and build static WASM bundle
+python3 soccer-web/serve.py       # serve on port 8000
 ```
 
 To build static files for deployment:
 
 ```bash
-pygbag --build soccer-web/  # output: soccer-web/build/web/
+bash soccer-web/build.sh  # output: soccer-web/build/web/
 ```
 
 ## Controls
 
-| Action | Player 1 | Player 2 |
-|--------|----------|----------|
-| Move   | Arrow keys | W A S D |
-| Shoot / Switch player | Space | Left Shift |
+| Action                | Player 1   | Player 2   |
+| --------------------- | ---------- | ---------- |
+| Move                  | Arrow keys | W A S D    |
+| Shoot / Switch player | Space      | Left Shift |
 
 ## Files
 
-| File | Description |
-|------|-------------|
+| File      | Description                                               |
+| --------- | --------------------------------------------------------- |
 | `main.py` | Game code (faithful port of `../soccer-master/soccer.py`) |
-| `images/` | Symlink → `../soccer-master/images/` |
-| `sounds/` | Symlink → `../soccer-master/sounds/` |
-| `music/`  | Symlink → `../soccer-master/music/`  |
+| `images/` | Symlink → `../soccer-master/images/`                      |
+| `sounds/` | Symlink → `../soccer-master/sounds/`                      |
+| `music/`  | Symlink → `../soccer-master/music/`                       |
+
+> **Windows note:** The asset directories (`images/`, `music/`, `sounds/`) are
+> stored as symlinks in the repository. On Windows these can be checked out as
+> plain text files instead of real symlinks, which causes asset loading to fail
+> silently (the `_load_image` helper in `main.py` falls back to a 1×1 transparent
+> surface when an image cannot be found). To avoid this, enable Git symlink
+> support before cloning: run `git config --global core.symlinks true` and enable
+> **Developer Mode** in Windows Settings (Settings → Privacy & Security → For
+> developers), then re-clone the repository.

@@ -7,5 +7,5 @@ FROM mcr.microsoft.com/vscode/devcontainers/python:${VARIANT}
 COPY requirements.txt /tmp/pip-tmp/
 RUN pip install --upgrade pip \
     && pip install -r /tmp/pip-tmp/requirements.txt \
-    && pip install pygbag \
+    && pip install pygbag==0.9.3 \
     && rm -rf /tmp/pip-tmp
